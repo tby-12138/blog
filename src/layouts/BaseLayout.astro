@@ -1,0 +1,88 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE, withBase } from '../lib/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  noindex?: boolean;
+}
+
+const { title, description = SITE.description, image, noindex = false } = Astro.props;
+
+const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE.description}`;
+const origin = Astro.site ?? Astro.url.origin;
+const canonical = new URL(Astro.url.pathname, origin).href;
+const ogImage = new URL(image ?? withBase('og.png'), origin).href;
+---
+
+<!doctype html>
+<html lang={SITE.locale} data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content={SITE.author} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content={SITE.title} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121210" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href={withBase('favicon.svg')} type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="64x64" href={withBase('favicon.png')} />
+    <link rel="apple-touch-icon" href={withBase('apple-touch-icon.png')} />
+    <link rel="alternate" type="application/rss+xml" title={SITE.title} href={withBase('rss.xml')} />
+
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem('blog-theme');
+          var dark = saved
+            ? saved === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+
+    <script>
+      import '../scripts/theme';
+
+      // 正文里的站外链接自动在新标签页打开
+      document.querySelectorAll<HTMLAnchorElement>('main a[href^="http"]').forEach((link) => {
+        if (link.origin !== window.location.origin) {
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+        }
+      });
+    </script>
+    <slot name="scripts" />
+  </body>
+</html>

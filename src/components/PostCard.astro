@@ -1,0 +1,31 @@
+---
+import type { Post } from '../lib/posts';
+import { formatDate, postUrl } from '../lib/site';
+
+interface Props {
+  post: Post;
+  index: number;
+}
+
+const { post, index } = Astro.props;
+const { title, description, pubDate, tags, draft } = post.data;
+const search = [title, description, ...tags].join(' ').toLowerCase();
+---
+
+<a class="post-card" href={postUrl(post.id)} data-post-item data-search={search}>
+  <span class="post-card-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+  <div class="post-card-body">
+    <div class="post-card-meta">
+      <time datetime={pubDate.toISOString()}>{formatDate(pubDate)}</time>
+      {draft && <span class="badge-draft">草稿</span>}
+    </div>
+    <h3>{title}</h3>
+    {description && <p>{description}</p>}
+    {tags.length > 0 && (
+      <div class="post-card-tags">
+        {tags.map((tag) => <span class="tag">{tag}</span>)}
+      </div>
+    )}
+  </div>
+  <span class="post-card-arrow" aria-hidden="true">→</span>
+</a>

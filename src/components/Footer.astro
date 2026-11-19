@@ -1,0 +1,22 @@
+---
+import { SITE, withBase } from '../lib/site';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="footer-inner container">
+    <p>© {year} {SITE.author} · 把零散的思考，写成可以重读的东西。</p>
+    <div class="footer-links">
+      <a href={withBase('rss.xml')}>RSS</a>
+      {SITE.github && (
+        <>
+          <span>·</span>
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+        </>
+      )}
+      <span>·</span>
+      <a href={withBase('admin/')} title="博客管理台">管理</a>
+    </div>
+  </div>
+</footer>

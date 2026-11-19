@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getPosts, tagSlug, type Post } from '../../lib/posts';
+import { withBase } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const groups = new Map<string, { tag: string; posts: Post[] }>();
+
+  for (const post of posts) {
+    for (const tag of post.data.tags) {
+      const slug = tagSlug(tag);
+      if (!groups.has(slug)) groups.set(slug, { tag, posts: [] });
+      groups.get(slug)!.posts.push(post);
+    }
+  }
+
+  return [...groups.entries()].map(([slug, group]) => ({
+    params: { tag: slug },
+    props: group,
+  }));
+}
+
+interface Props {
+  tag: string;
+  posts: Post[];
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<BaseLayout title={`#${tag}`} description={`标签 #${tag} 下的全部文章。`}>
+  <section class="container">
+    <header class="page-header">
+      <p class="eyebrow">TOPIC</p>
+      <h1>#{tag}</h1>
+      <p>共 {posts.length} 篇文章。 <a class="inline-link" href={withBase('tags/')}>查看全部标签 →</a></p>
+    </header>
+
+    <div class="page-list">
+      {posts.map((post, index) => <PostCard post={post} index={index} />)}
+    </div>
+  </section>
+</BaseLayout>

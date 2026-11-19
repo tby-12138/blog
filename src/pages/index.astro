@@ -1,0 +1,164 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { collectTags, getPosts, tagSlug } from '../lib/posts';
+import { SITE, formatDate, tagUrl, withBase } from '../lib/site';
+
+const posts = await getPosts();
+const tags = collectTags(posts);
+const latest = posts[0]?.data.pubDate;
+const tagList = [...tags.entries()];
+---
+
+<BaseLayout>
+  <section class="hero container">
+    <div class="hero-copy">
+      <p class="eyebrow">BLOG · EST. {SITE.since}</p>
+      <h1>把零散的思考，<br /><em>写成可以重读的东西。</em></h1>
+      <p class="hero-desc">
+        {SITE.description} 这里没有算法推荐，只有按时间生长的文字：技术笔记、读书摘记，以及生活里那些不想忘记的瞬间。
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#posts">开始阅读 <span aria-hidden="true">↓</span></a>
+        <a class="btn btn-ghost" href={withBase('about/')}>关于这里</a>
+      </div>
+      <div class="hero-stats">
+        <span class="hero-stat"><strong>{posts.length}</strong> 篇文章</span>
+        <span class="hero-stat"><strong>{tags.size}</strong> 个标签</span>
+        {latest && <span class="hero-stat"><strong>{formatDate(latest)}</strong> 最近更新</span>}
+      </div>
+    </div>
+
+    <div class="hero-art" aria-hidden="true">
+      <div class="hero-orbit"></div>
+      <div class="hero-stamp">白雲<br />札記</div>
+      <p class="hero-vertical">记录 · 思考 · 生活</p>
+    </div>
+  </section>
+
+  <section class="section container" id="posts">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">ARCHIVE</p>
+        <h2>最近文章</h2>
+      </div>
+      <div class="section-tools">
+        <span class="section-count" id="post-count">共 {posts.length} 篇</span>
+        <label class="search">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-3.5-3.5"></path>
+          </svg>
+          <input
+            id="post-search"
+            type="search"
+            placeholder="搜索标题、摘要或标签…"
+            aria-label="搜索文章"
+            autocomplete="off"
+          />
+          <kbd>/</kbd>
+        </label>
+      </div>
+    </div>
+
+    <div class="home-grid">
+      <div>
+        <div class="post-list" id="post-list">
+          {posts.map((post, index) => <PostCard post={post} index={index} />)}
+        </div>
+        {posts.length === 0 && <p class="empty-state">还没有文章。打开 <a href={withBase('admin/')}>管理台</a> 写第一篇吧。</p>}
+        <p class="empty-state" id="search-empty" hidden>没有找到匹配的文章，换个关键词试试。</p>
+      </div>
+
+      <aside class="home-sidebar" aria-label="侧栏">
+        <div class="side-card">
+          <h3>关于</h3>
+          <div class="side-about">
+            <span class="side-avatar" aria-hidden="true">云</span>
+            <div>
+              <strong>{SITE.author}</strong>
+              <span>写作者 · 记录者</span>
+            </div>
+          </div>
+          <p>在信息流之外留一块安静的地方，慢慢写，也慢慢读。</p>
+          <div class="side-links">
+            <a href={withBase('about/')}>了解更多</a>
+            <a href={withBase('rss.xml')}>RSS 订阅</a>
+          </div>
+        </div>
+
+        {tagList.length > 0 && (
+          <div class="side-card">
+            <h3>标签</h3>
+            <div class="side-tags">
+              {tagList.slice(0, 10).map(([tag, count]) => (
+                <a href={tagUrl(tagSlug(tag))}>
+                  {tag} <em>{count}</em>
+                </a>
+              ))}
+            </div>
+            <div class="side-links">
+              <a href={withBase('tags/')}>全部标签 →</a>
+            </div>
+          </div>
+        )}
+
+        <a class="side-rss" href={withBase('rss.xml')}>
+          <span>用 RSS 阅读器订阅</span>
+          <span aria-hidden="true">↗</span>
+        </a>
+      </aside>
+    </div>
+  </section>
+
+  <script slot="scripts">
+    const input = document.querySelector('#post-search');
+    const items = Array.from(document.querySelectorAll('[data-post-item]'));
+    const empty = document.querySelector('#search-empty');
+    const count = document.querySelector('#post-count');
+    const total = items.length;
+
+    if (input && empty && count) {
+      const filter = () => {
+        const query = input.value.trim().toLowerCase();
+        let visible = 0;
+
+        items.forEach((item) => {
+          const hit = !query || (item.dataset.search ?? '').includes(query);
+          item.hidden = !hit;
+          if (hit) visible += 1;
+        });
+
+        empty.hidden = visible !== 0 || total === 0;
+        count.textContent = query ? `${visible} / ${total} 篇` : `共 ${total} 篇`;
+      };
+
+      input.addEventListener('input', filter);
+
+      document.addEventListener('keydown', (event) => {
+        const target = event.target;
+        const typing =
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          (target && target.isContentEditable);
+
+        if (event.key === '/' && !typing) {
+          event.preventDefault();
+          input.focus();
+        }
+        if (event.key === 'Escape' && document.activeElement === input) {
+          input.value = '';
+          filter();
+          input.blur();
+        }
+      });
+    }
+  </script>
+</BaseLayout>

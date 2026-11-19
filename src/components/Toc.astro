@@ -1,0 +1,24 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+---
+
+<nav class="toc toc-desktop" aria-label="文章目录">
+  <p class="toc-title">目录</p>
+  <ul>
+    {headings.map((heading) => (
+      <li class:list={[`toc-depth-${heading.depth}`]}>
+        <a href={`#${heading.slug}`}>{heading.text}</a>
+      </li>
+    ))}
+  </ul>
+</nav>

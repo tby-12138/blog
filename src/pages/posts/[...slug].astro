@@ -1,0 +1,183 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Toc from '../../components/Toc.astro';
+import { getPosts, readingMinutes } from '../../lib/posts';
+import { formatDate, isoDate, postUrl, withBase } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const posts = await getPosts({ includeDrafts: import.meta.env.DEV });
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { title, description, pubDate, updatedDate, tags, draft, cover: rawCover } = post.data;
+const { Content, headings } = await render(post);
+
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const minutes = readingMinutes(post.body ?? '');
+
+const cover = rawCover
+  ? /^https?:\/\//.test(rawCover)
+    ? rawCover
+    : withBase(rawCover)
+  : undefined;
+
+const all = await getPosts({ includeDrafts: import.meta.env.DEV });
+const index = all.findIndex((item) => item.id === post.id);
+const newer = index > 0 ? all[index - 1] : undefined;
+const older = index >= 0 && index < all.length - 1 ? all[index + 1] : undefined;
+---
+
+<BaseLayout title={title} description={description || title} image={cover}>
+  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
+
+  <article class="post">
+    <header class="post-header container-narrow">
+      <a class="back-link" href={withBase('')}>← 返回文章列表</a>
+
+      <div class="post-kicker">
+        <time datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
+        <span class="dot">·</span>
+        <span>{minutes} 分钟阅读</span>
+        {draft && <span class="badge-draft">草稿</span>}
+      </div>
+
+      <h1>{title}</h1>
+      {description && <p class="post-lede">{description}</p>}
+
+      {tags.length > 0 && (
+        <div class="post-tags">
+          {tags.map((tag) => <span class="tag">{tag}</span>)}
+        </div>
+      )}
+
+      {updatedDate && (
+        <p class="post-updated">最后更新于 <time datetime={isoDate(updatedDate)}>{formatDate(updatedDate)}</time></p>
+      )}
+    </header>
+
+    {cover && (
+      <figure class="post-cover">
+        <img src={cover} alt={title} loading="eager" />
+      </figure>
+    )}
+
+    <div class="container">
+      {toc.length > 1 && (
+        <details class="toc-mobile">
+          <summary>本文目录 · {toc.length} 节</summary>
+          <ul>
+            {toc.map((heading) => (
+              <li><a href={`#${heading.slug}`}>{heading.text}</a></li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      <div class:list={['post-body', { 'no-toc': toc.length <= 1 }]}>
+        <div class="prose">
+          <Content />
+        </div>
+        {toc.length > 1 && <Toc headings={toc} />}
+      </div>
+    </div>
+
+    <footer class="post-footer container-narrow">
+      <div class="post-end" aria-hidden="true">✦</div>
+
+      {(newer || older) && (
+        <nav class="post-nav" aria-label="上一篇 / 下一篇">
+          {newer ? (
+            <a href={postUrl(newer.id)}>
+              <small>较新一篇</small>
+              <strong>{newer.data.title}</strong>
+            </a>
+          ) : (
+            <span class="placeholder" aria-hidden="true"></span>
+          )}
+          {older ? (
+            <a class="next" href={postUrl(older.id)}>
+              <small>较旧一篇</small>
+              <strong>{older.data.title}</strong>
+            </a>
+          ) : (
+            <span class="placeholder" aria-hidden="true"></span>
+          )}
+        </nav>
+      )}
+
+      <a class="btn btn-ghost" href={withBase('')}>回到全部文章</a>
+    </footer>
+  </article>
+
+  <script slot="scripts">
+  // 阅读进度
+  const progress = document.querySelector('#reading-progress');
+  if (progress) {
+    const update = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const ratio = max > 0 ? window.scrollY / max : 0;
+      progress.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
+    };
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
+
+  // 代码块复制按钮
+  document.querySelectorAll('.prose pre').forEach((pre) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-code';
+    button.textContent = '复制';
+    button.setAttribute('aria-label', '复制代码');
+
+    button.addEventListener('click', async () => {
+      const code = pre.querySelector('code')?.innerText ?? pre.innerText;
+      try {
+        await navigator.clipboard.writeText(code);
+        button.textContent = '已复制';
+        window.setTimeout(() => {
+          button.textContent = '复制';
+        }, 1600);
+      } catch {
+        button.textContent = '复制失败';
+        window.setTimeout(() => {
+          button.textContent = '复制';
+        }, 1600);
+      }
+    });
+
+    pre.appendChild(button);
+  });
+
+  // 目录高亮
+  const tocLinks = Array.from(document.querySelectorAll('.toc-desktop a'));
+  const headings = Array.from(document.querySelectorAll('.prose h2[id], .prose h3[id]'));
+
+  if (tocLinks.length > 0 && headings.length > 0) {
+    const linkById = new Map();
+    tocLinks.forEach((link) => {
+      const id = decodeURIComponent(link.hash.replace(/^#/, ''));
+      linkById.set(id, link);
+    });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('active'));
+          linkById.get(entry.target.id)?.classList.add('active');
+        });
+      },
+      { rootMargin: '-96px 0px -68% 0px', threshold: 0 },
+    );
+
+    headings.forEach((heading) => observer.observe(heading));
+  }
+  </script>
+</BaseLayout>

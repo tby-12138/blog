@@ -1,0 +1,299 @@
+---
+import '../../styles/global.css';
+import '../../styles/admin.css';
+import ThemeToggle from '../../components/ThemeToggle.astro';
+import { SITE } from '../../lib/site';
+
+const owner = import.meta.env.PUBLIC_REPO_OWNER ?? '';
+const repo = import.meta.env.PUBLIC_REPO_NAME ?? '';
+const branch = import.meta.env.PUBLIC_REPO_BRANCH || 'main';
+const base = import.meta.env.BASE_URL;
+const siteInitial = SITE.title.trim().charAt(0) || '博';
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>管理台 · {SITE.title}</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121210" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="64x64" href={`${base}favicon.png`} />
+
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem('blog-theme');
+          var dark = saved
+            ? saved === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+
+  <body class="admin-body">
+    <div
+      id="admin-root"
+      data-owner={owner}
+      data-repo={repo}
+      data-branch={branch}
+      data-base={base}
+      data-site={SITE.title}
+    >
+      <section class="login-screen" id="login-view">
+        <div class="login-theme">
+          <ThemeToggle />
+        </div>
+
+        <div class="login-card">
+          <div class="login-brand">
+            <span class="brand-seal" aria-hidden="true">{siteInitial}</span>
+            <div>
+              <strong>{SITE.title}</strong>
+              <span>内容管理台</span>
+            </div>
+          </div>
+
+          <h1>登录你的仓库</h1>
+          <p class="login-desc">
+            用 GitHub Token 连接博客仓库。所有修改都会以 commit 的形式提交，并由 GitHub Actions
+            自动构建发布。
+          </p>
+
+          <form id="login-form" novalidate>
+            <div class="form-grid">
+              <label class="field">
+                <span>GitHub 用户名</span>
+                <input id="owner-input" name="owner" type="text" placeholder="octocat" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span>仓库名</span>
+                <input id="repo-input" name="repo" type="text" placeholder="my-blog" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>分支</span>
+              <input id="branch-input" name="branch" type="text" value="main" autocomplete="off" spellcheck="false" />
+            </label>
+
+            <label class="field">
+              <span>Personal Access Token</span>
+              <input
+                id="token-input"
+                name="token"
+                type="password"
+                placeholder="github_pat_… 或 ghp_…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+
+            <label class="check-row">
+              <input id="remember-input" type="checkbox" checked />
+              <span>在这台设备上记住令牌</span>
+            </label>
+
+            <p class="form-error" id="login-error" role="alert" hidden></p>
+
+            <button class="btn btn-primary btn-block" id="login-btn" type="submit">连接仓库</button>
+          </form>
+
+          <details class="login-help">
+            <summary>第一次使用？创建 Token 的步骤</summary>
+            <ol>
+              <li>进入 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens。</li>
+              <li>Repository access 选择 <strong>Only select repositories</strong>，勾选你的博客仓库。</li>
+              <li>Permissions → Repository permissions → 把 <strong>Contents</strong> 设为 <strong>Read and write</strong>。</li>
+              <li>生成后复制令牌，粘贴到上面的输入框。</li>
+            </ol>
+            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">
+              打开 Token 创建页面 ↗
+            </a>
+          </details>
+
+          <p class="login-note">
+            令牌只保存在本机浏览器（localStorage / sessionStorage），不会写入仓库，也不会发送到
+            GitHub 以外的服务器。公共电脑请取消勾选“记住令牌”。
+          </p>
+        </div>
+      </section>
+
+      <div class="admin-app" id="editor-view" hidden>
+        <aside class="admin-sidebar" id="admin-sidebar">
+          <div class="sidebar-head">
+            <div class="sidebar-brand">
+              <span class="brand-seal" aria-hidden="true">{siteInitial}</span>
+              <div>
+                <strong>文章管理</strong>
+                <span id="repo-label">—</span>
+              </div>
+            </div>
+            <button class="icon-btn only-mobile" id="sidebar-close" type="button" aria-label="关闭文章列表">×</button>
+          </div>
+
+          <div class="sidebar-actions">
+            <button class="btn btn-primary btn-block" id="new-post" type="button">+ 新建文章</button>
+            <input class="input" id="post-filter" type="search" placeholder="搜索文章…" aria-label="搜索文章" />
+          </div>
+
+          <nav class="admin-post-list" id="admin-post-list" aria-label="文章列表"></nav>
+
+          <div class="sidebar-foot">
+            <div class="sidebar-meta">
+              <span id="post-total">0 篇</span>
+              <span id="branch-label">main</span>
+            </div>
+            <div class="sidebar-links">
+              <a id="site-link" href={base} target="_blank" rel="noopener">查看站点 ↗</a>
+              <a id="actions-link" href="#" target="_blank" rel="noopener">部署记录 ↗</a>
+            </div>
+            <div class="sidebar-bottom">
+              <ThemeToggle />
+              <button class="link-btn" id="logout" type="button">退出并清除令牌</button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="admin-main">
+          <header class="admin-topbar">
+            <button class="icon-btn only-mobile" id="sidebar-open" type="button" aria-label="打开文章列表">☰</button>
+            <div class="admin-crumb">
+              <span>文章</span>
+              <span class="crumb-sep">/</span>
+              <strong id="crumb-title">未选择</strong>
+            </div>
+            <div class="admin-actions">
+              <span class="save-state" id="save-state"></span>
+              <a class="btn btn-ghost btn-sm" id="preview-link" href="#" target="_blank" rel="noopener" hidden>预览 ↗</a>
+              <button class="btn btn-danger btn-sm" id="delete-post" type="button" hidden>删除</button>
+              <button class="btn btn-primary btn-sm" id="save-post" type="button" disabled>保存</button>
+            </div>
+          </header>
+
+          <div class="admin-scroll" id="admin-scroll">
+            <section class="admin-empty" id="admin-empty">
+              <div class="empty-mark" aria-hidden="true">✦</div>
+              <h2>选择一篇文章，或新建一篇</h2>
+              <p>保存后会直接提交到 GitHub，通常 1–2 分钟后线上自动更新。</p>
+              <button class="btn btn-primary" id="new-post-empty" type="button">写点什么</button>
+            </section>
+
+            <form class="admin-form" id="post-form" hidden>
+              <div class="form-fields">
+                <label class="field field-full">
+                  <span>标题</span>
+                  <input id="field-title" type="text" placeholder="给这篇文章起个标题" autocomplete="off" />
+                </label>
+
+                <label class="field">
+                  <span>链接别名 <em>slug</em></span>
+                  <input id="field-slug" type="text" placeholder="my-first-post" autocomplete="off" spellcheck="false" />
+                  <small>文章地址为 /posts/&lt;slug&gt;/，创建后不可修改</small>
+                </label>
+
+                <label class="field">
+                  <span>发布日期</span>
+                  <input id="field-date" type="date" />
+                </label>
+
+                <label class="field field-full">
+                  <span>摘要 <em>可选</em></span>
+                  <textarea id="field-description" rows="2" placeholder="一句话概括这篇文章，会显示在列表和搜索结果里"></textarea>
+                </label>
+
+                <label class="field">
+                  <span>标签 <em>用逗号分隔</em></span>
+                  <input id="field-tags" type="text" placeholder="技术, 随笔" autocomplete="off" />
+                </label>
+
+                <div class="field field-inline">
+                  <label class="check-row">
+                    <input id="field-draft" type="checkbox" />
+                    <span>保存为草稿（不发布）</span>
+                  </label>
+                </div>
+
+                <div class="field field-full">
+                  <span>封面图 <em>可选</em></span>
+                  <div class="input-with-button">
+                    <input id="field-cover" type="text" placeholder="/images/cover.jpg 或 https://…" autocomplete="off" spellcheck="false" />
+                    <button class="btn btn-ghost btn-sm" id="upload-cover" type="button">上传</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="editor-toolbar">
+                <div class="toolbar-group" role="toolbar" aria-label="Markdown 工具">
+                  <button type="button" data-insert="h2" title="二级标题">H2</button>
+                  <button type="button" data-insert="h3" title="三级标题">H3</button>
+                  <span class="toolbar-sep"></span>
+                  <button type="button" data-insert="bold" title="加粗"><strong>B</strong></button>
+                  <button type="button" data-insert="italic" title="斜体"><em>I</em></button>
+                  <button type="button" data-insert="quote" title="引用">❝</button>
+                  <button type="button" data-insert="inline-code" title="行内代码">&lt;/&gt;</button>
+                  <button type="button" data-insert="code-block" title="代码块">⌗</button>
+                  <span class="toolbar-sep"></span>
+                  <button type="button" data-insert="link" title="链接">↗</button>
+                  <button type="button" data-insert="list" title="无序列表">•</button>
+                  <button type="button" data-insert="ordered" title="有序列表">1.</button>
+                  <button type="button" data-insert="table" title="表格">▦</button>
+                  <button type="button" data-insert="hr" title="分隔线">—</button>
+                  <button type="button" data-insert="image" title="上传图片">▧</button>
+                </div>
+
+                <div class="toolbar-right">
+                  <span class="word-count" id="word-count">0 字</span>
+                  <div class="segmented only-mobile" role="tablist" aria-label="编辑或预览">
+                    <button type="button" id="tab-write" class="active" role="tab" aria-selected="true">编辑</button>
+                    <button type="button" id="tab-preview" role="tab" aria-selected="false">预览</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="editor-split" id="editor-split">
+                <div class="editor-pane active" id="write-pane">
+                  <textarea
+                    id="field-body"
+                    spellcheck="false"
+                    placeholder="从这里开始写……&#10;&#10;支持 Markdown：## 标题、**加粗**、- 列表、> 引用、``` 代码块"></textarea>
+                </div>
+                <div class="editor-pane preview-pane" id="preview-pane">
+                  <div class="prose preview" id="preview"></div>
+                </div>
+              </div>
+
+              <input id="image-input" type="file" accept="image/*" multiple hidden />
+            </form>
+          </div>
+        </main>
+
+        <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+      </div>
+
+      <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+    </div>
+
+    <dialog class="confirm-dialog" id="confirm-dialog">
+      <form method="dialog" class="confirm-box">
+        <h2 id="confirm-title">确认操作</h2>
+        <p id="confirm-text"></p>
+        <div class="confirm-actions">
+          <button class="btn btn-ghost" value="cancel" type="submit">取消</button>
+          <button class="btn btn-danger" id="confirm-ok" value="ok" type="submit">确认</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      import '../../scripts/admin';
+    </script>
+  </body>
+</html>
